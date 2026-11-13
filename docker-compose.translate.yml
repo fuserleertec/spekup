@@ -1,0 +1,11 @@
+# Opt-in local translator. It does not start with `docker compose up`.
+# docker compose -f docker-compose.yml -f docker-compose.translate.yml --profile translate up
+services:
+  libretranslate:
+    image: libretranslate/libretranslate:v1.6.1
+    profiles: ["translate"]
+    restart: unless-stopped
+    environment:
+      LT_LOAD_ONLY: en,pt,es,ja,ko,zh
+    ports:
+      - "127.0.0.1:5000:5000"

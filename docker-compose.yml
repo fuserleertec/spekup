@@ -1,0 +1,96 @@
+name: common-voice-vitavus-preview
+
+services:
+  db:
+    image: postgres:16-alpine
+    platform: linux/arm64
+    environment:
+      POSTGRES_USER: common_voice
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: common_voice
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U common_voice -d common_voice"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      DATABASE_URL: postgres://common_voice:${POSTGRES_PASSWORD}@db:5432/common_voice
+      MEDIA_DIR: /data/media
+      PORT: "8080"
+      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?Set PROXY_SHARED_SECRET in .env}
+      COOKIE_SECURE: "0"
+      TRANSLATE_PROVIDER: ${TRANSLATE_PROVIDER:-off}
+      TRANSLATE_URL: ${TRANSLATE_URL:-}
+      TRANSLATE_API_KEY: ${TRANSLATE_API_KEY:-}
+      TRANSLATE_MODEL: ${TRANSLATE_MODEL:-}
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  worker:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    command: ["node", "dist/worker.js"]
+    mem_limit: 512m
+    cpus: "1.0"
+    environment:
+      DATABASE_URL: postgres://common_voice:${POSTGRES_PASSWORD}@db:5432/common_voice
+      MEDIA_DIR: /data/media
+      VIDEO_MAX_ATTEMPTS: "3"
+      FFMPEG_TIMEOUT_MS: "60000"
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        SITE_URL: ${SITE_URL:-http://127.0.0.1:4185}
+        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:4185}
+    environment:
+      API_INTERNAL_URL: http://api:8080
+      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?Set PROXY_SHARED_SECRET in .env}
+      SITE_URL: ${SITE_URL:-http://127.0.0.1:4185}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:4185}
+      PORT: "4185"
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:4185:4185"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4185/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:

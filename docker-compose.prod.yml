@@ -1,0 +1,43 @@
+# Opt-in public host. The preview compose file is unchanged.
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+services:
+  api:
+    environment:
+      NODE_ENV: production
+      COOKIE_SECURE: "1"
+  worker:
+    environment:
+      NODE_ENV: production
+  web:
+    environment:
+      PUBLIC_BASE_URL: https://spekup.com
+      SITE_URL: https://spekup.com
+      ALLOWED_HOSTS: spekup.com,www.spekup.com,127.0.0.1:4185,localhost:4185
+    build:
+      args:
+        PUBLIC_BASE_URL: https://spekup.com
+        SITE_URL: https://spekup.com
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    depends_on:
+      web:
+        condition: service_healthy
+
+  libretranslate:
+    image: libretranslate/libretranslate:v1.6.1
+    profiles: ["translate"]
+    restart: unless-stopped
+    environment:
+      LT_LOAD_ONLY: en,pt,es,ja,ko,zh
+    expose:
+      - "5000"
+
+volumes:
+  caddydata:

@@ -1,0 +1,19 @@
+# Opt-in malware scan. Files stay labeled "not scanned" until this file is used
+# and CLAMAV_HOST is set. A clean result is not a guarantee.
+# docker compose -f docker-compose.yml -f docker-compose.scan.yml --profile scan up
+services:
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["scan"]
+    restart: unless-stopped
+  api:
+    environment:
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+    depends_on:
+      clamav:
+        condition: service_started
+  worker:
+    environment:
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"

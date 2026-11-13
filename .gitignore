@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/build
+**/.next
+**/__pycache__
+.venv
+uploads
+data
+*.pem
+*.key
+.DS_Store
+playwright-report
+test-results
